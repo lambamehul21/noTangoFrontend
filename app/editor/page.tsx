@@ -41,6 +41,12 @@ interface EditorInstance {
   containerEl: HTMLElement;
   parentFrameId?: string;
   autoSaveInterval?: NodeJS.Timeout;
+  frameDimensions?: {
+    width: string;
+    height: string;
+    padding: string;
+    autoHeight: boolean;
+  };
 }
 
 const EditorGrapes = () => {
@@ -334,8 +340,6 @@ const EditorGrapes = () => {
       }
     });
 
-    // Define the custom Frame component
-    // Define the improved Frame component with better content handling
     // Define the improved and error-proof frame component
     editor.DomComponents.addType('frame', {
       model: {
@@ -354,10 +358,14 @@ const EditorGrapes = () => {
             minWidth: '100px',
             backgroundColor: '#e8f4fc',
             border: '1px dashed #3498db',
-            borderRadius: '4px'
+            borderRadius: '4px',
+            overflow: 'hidden'
           },
           // Store a unique ID for the frame
-          attributes: { 'data-frame-id': Date.now().toString() },
+          attributes: { 
+            'data-frame-id': Date.now().toString(),
+            'data-auto-height': 'true',
+          },
           // Indicator for frames that can be drilled into
           icon: '<i class="fa fa-window-maximize"></i>',
           label: 'Frame',
@@ -378,6 +386,18 @@ const EditorGrapes = () => {
             { 
               attributes: { class: 'fa fa-trash-o' },
               command: 'tlb-delete', 
+            },
+            // Add toggle for auto-height
+            {
+              attributes: { class: 'fa fa-arrows-v', title: 'Toggle auto-height' },
+              command: {
+                run: function(editor: any, sender: any, options: any) {
+                  const component = editor.getSelected();
+                  const autoHeight = component.getAttributes()['data-auto-height'] === 'true';
+                  component.setAttributes({ 'data-auto-height': (!autoHeight).toString() });
+                  return component;
+                }
+              },
             },
           ],
         }
@@ -409,66 +429,83 @@ const EditorGrapes = () => {
         }
       }
     });
-    // Add command for editing frames
+
     // Add a more robust command for editing frames
-editor.Commands.add('frame-edit', {
-  run(editor, sender, options = {}) {
-    const frameComponent = options.frameComponent;
-    if (frameComponent) {
-      try {
-        // Get the frame ID, generating a new one if it doesn't exist
-        let frameId = frameComponent.getAttributes()['data-frame-id'];
-        if (!frameId) {
-          frameId = `frame-${Date.now()}`;
-          frameComponent.setAttributes({ 'data-frame-id': frameId });
-        }
-        
-        // Get the frame's HTML content
-        let frameContent = '';
-        
-        // Try different methods to get the content
-        try {
-          // Method 1: Get HTML directly from the component
-          frameContent = editor.getHtml(frameComponent);
-        } catch (err) {
-          console.warn('Method 1 failed to get frame content:', err);
-          
+    editor.Commands.add('frame-edit', {
+      run(editor, sender, options = {}) {
+        const frameComponent = options.frameComponent;
+        if (frameComponent) {
           try {
-            // Method 2: Build HTML from components
-            frameComponent.components().forEach((comp: any) => {
-              frameContent += comp.toHTML();
-            });
-          } catch (err) {
-            console.warn('Method 2 failed to get frame content:', err);
-            
-            try {
-              // Method 3: Get from DOM element if available
-              const el = frameComponent.view && frameComponent.view.el;
-              if (el) {
-                frameContent = el.innerHTML;
-              }
-            } catch (err) {
-              console.warn('Method 3 failed to get frame content:', err);
+            // Get the frame ID, generating a new one if it doesn't exist
+            let frameId = frameComponent.getAttributes()['data-frame-id'];
+            if (!frameId) {
+              frameId = `frame-${Date.now()}`;
+              frameComponent.setAttributes({ 'data-frame-id': frameId });
             }
+            
+            // Get the frame dimensions
+            const frameEl = frameComponent.view.el;
+            const frameRect = frameEl.getBoundingClientRect();
+            const frameWidth = frameComponent.getStyle().width || `${frameRect.width}px`;
+            const frameHeight = frameComponent.getStyle().height || `${frameRect.height}px`;
+            const framePadding = frameComponent.getStyle().padding || '20px';
+            const autoHeight = frameComponent.getAttributes()['data-auto-height'] === 'true';
+            
+            // Get the frame's HTML content
+            let frameContent = '';
+            
+            // Try different methods to get the content
+            try {
+              // Method 1: Get HTML directly from the component
+              frameContent = editor.getHtml(frameComponent);
+            } catch (err) {
+              console.warn('Method 1 failed to get frame content:', err);
+              
+              try {
+                // Method 2: Build HTML from components
+                frameComponent.components().forEach((comp: any) => {
+                  frameContent += comp.toHTML();
+                });
+              } catch (err) {
+                console.warn('Method 2 failed to get frame content:', err);
+                
+                try {
+                  // Method 3: Get from DOM element if available
+                  const el = frameComponent.view && frameComponent.view.el;
+                  if (el) {
+                    frameContent = el.innerHTML;
+                  }
+                } catch (err) {
+                  console.warn('Method 3 failed to get frame content:', err);
+                }
+              }
+            }
+            
+            // If we still don't have content, use a placeholder
+            if (!frameContent || frameContent.trim() === '') {
+              frameContent = '<div style="min-height: 50px;"></div>';
+            }
+            
+            // Create a new editor for this frame's content
+            createNestedEditor(
+              frameId, 
+              frameContent, 
+              {
+                width: frameWidth,
+                height: frameHeight,
+                padding: framePadding,
+                autoHeight
+              }
+            );
+          } catch (error) {
+            console.error('Error opening frame editor:', error);
+            alert('There was an error opening the frame editor. Please try again.');
           }
+        } else {
+          console.error('No frame component provided to frame-edit command');
         }
-        
-        // If we still don't have content, use a placeholder
-        if (!frameContent || frameContent.trim() === '') {
-          frameContent = '<div style="min-height: 50px;"></div>';
-        }
-        
-        // Create a new editor for this frame's content
-        createNestedEditor(frameId, frameContent);
-      } catch (error) {
-        console.error('Error opening frame editor:', error);
-        alert('There was an error opening the frame editor. Please try again.');
       }
-    } else {
-      console.error('No frame component provided to frame-edit command');
-    }
-  }
-});
+    });
 
     // Set default resizable options for all components
     editor.on('component:create', component => {
@@ -497,399 +534,692 @@ editor.Commands.add('frame-edit', {
     return editor;
   };
 
-// Create a new nested editor for a frame with consistent sidebars
-const createNestedEditor = (frameId: string, frameContent: string) => {
-  // Generate a unique ID for this nested editor
-  const nestedEditorId = `nested-editor-${Date.now()}`;
-  
-  // Clear any previous content
-  if (nestedEditorContainerRef.current) {
-    nestedEditorContainerRef.current.innerHTML = '';
+  // Create a new nested editor for a frame with consistent sidebars
+  const createNestedEditor = (
+    frameId: string, 
+    frameContent: string,
+    frameDimensions?: {
+      width: string;
+      height: string;
+      padding: string;
+      autoHeight: boolean;
+    }
+  ) => {
+    // Generate a unique ID for this nested editor
+    const nestedEditorId = `nested-editor-${Date.now()}`;
     
-    // Create a complete editor structure with sidebars similar to the main editor
-    // Now including all the same tabs as the main editor
-    nestedEditorContainerRef.current.innerHTML = `
-      <div class="editor-main nested-editor-structure">
-        <!-- Left sidebar - Block manager -->
-        <div class="panel-left">
-          <div class="panel-header">
-            <i class="fa fa-square"></i> Blocks
+    // Clean up any previous content
+    if (nestedEditorContainerRef.current) {
+      nestedEditorContainerRef.current.innerHTML = '';
+      
+      // Create a complete editor structure with sidebars similar to the main editor
+      // Now including all the same tabs as the main editor
+      nestedEditorContainerRef.current.innerHTML = `
+        <div class="editor-main nested-editor-structure">
+          <!-- Left sidebar - Block manager -->
+          <div class="panel-left">
+            <div class="panel-header">
+              <i class="fa fa-square"></i> Blocks
+            </div>
+            <div id="blocks-${nestedEditorId}" class="panel-blocks"></div>
           </div>
-          <div id="blocks-${nestedEditorId}" class="panel-blocks"></div>
-        </div>
 
-        <!-- Main editor canvas -->
-        <div id="${nestedEditorId}" class="editor-canvas"></div>
-
-        <!-- Right sidebar with tabs - now including all the same tabs as main editor -->
-        <div class="panel-right">
-          <div class="panel-tabs">
-            <button class="tab-btn active" data-tab="properties">
-              <i class="fa fa-pencil-alt"></i> Properties
-            </button>
-            <button class="tab-btn" data-tab="objects">
-              <i class="fa fa-layer-group"></i> Objects
-            </button>
-            <button class="tab-btn" data-tab="records">
-              <i class="fa fa-database"></i> Records
-            </button>
+          <!-- Main editor canvas with frame preview container -->
+          <div class="editor-canvas-container">
+            <!-- Frame dimensions display -->
+            <div class="frame-dimensions-display">
+              <span class="dimension-label">Frame: </span>
+              <span class="frame-width">${frameDimensions?.width || 'auto'}</span> × 
+              <span class="frame-height">${frameDimensions?.height || 'auto'}</span>
+              <span class="auto-height-indicator ${frameDimensions?.autoHeight ? 'active' : ''}">
+                Auto-height ${frameDimensions?.autoHeight ? 'ON' : 'OFF'}
+              </span>
+            </div>
+            
+            <!-- Frame preview wrapper that constrains the canvas -->
+            <div class="frame-preview-wrapper" 
+                 style="${frameDimensions ? `
+                   width: ${frameDimensions.width}; 
+                   min-height: ${frameDimensions.height};
+                   padding: ${frameDimensions.padding};
+                   ${frameDimensions.autoHeight ? 'height: auto;' : `height: ${frameDimensions.height};`}
+                 ` : ''}">
+              <div id="${nestedEditorId}" class="editor-canvas frame-preview-canvas"></div>
+            </div>
           </div>
-          <div class="panel-content">
-            <div id="style-manager-${nestedEditorId}" class="style-manager-container" style="display: block;"></div>
-            <div id="layers-container-${nestedEditorId}" class="layers-container" style="display: none;"></div>
-            <div 
-              id="records-${nestedEditorId}" 
-              style="display: none;"
-              class="records-container"
-            >
-              <div class="records-header">
-                <h3><i class="fa fa-database"></i> XML Records</h3>
-                <div class="table-selector">
-                  <label for="table-select-${nestedEditorId}">Select XML Table:</label>
-                  <select 
-                    id="table-select-${nestedEditorId}" 
-                    class="nested-table-select"
-                  >
-                    ${tableNames.map(name => 
-                      `<option value="${name}" ${name === selectedTable ? 'selected' : ''}>${name}</option>`
-                    ).join('')}
-                  </select>
+
+          <!-- Right sidebar with tabs -->
+          <div class="panel-right">
+            <div class="panel-tabs">
+              <button class="tab-btn active" data-tab="properties">
+                <i class="fa fa-pencil-alt"></i> Properties
+              </button>
+              <button class="tab-btn" data-tab="objects">
+                <i class="fa fa-layer-group"></i> Objects
+              </button>
+              <button class="tab-btn" data-tab="records">
+                <i class="fa fa-database"></i> Records
+              </button>
+            </div>
+            <div class="panel-content">
+              <div id="style-manager-${nestedEditorId}" class="style-manager-container" style="display: block;"></div>
+              <div id="layers-container-${nestedEditorId}" class="layers-container" style="display: none;"></div>
+              <div 
+                id="records-${nestedEditorId}" 
+                style="display: none;"
+                class="records-container"
+              >
+                <div class="records-header">
+                  <h3><i class="fa fa-database"></i> XML Records</h3>
+                  <div class="table-selector">
+                    <label for="table-select-${nestedEditorId}">Select XML Table:</label>
+                    <select 
+                      id="table-select-${nestedEditorId}" 
+                      class="nested-table-select"
+                    >
+                      ${tableNames.map(name => 
+                        `<option value="${name}" ${name === selectedTable ? 'selected' : ''}>${name}</option>`
+                      ).join('')}
+                    </select>
+                  </div>
                 </div>
-              </div>
-              <div class="records-content">
-                <div class="tree-view">
-                  ${treeData.map(node => renderTreeNodeHtml(node)).join('')}
+                <div className="records-content">
+                  <div className="tree-view">
+                    ${treeData.map(node => renderTreeNodeHtml(node)).join('')}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    `;
-    
-    // Set up tab switching in the nested editor
-    const tabButtons = nestedEditorContainerRef.current.querySelectorAll('.tab-btn');
-    tabButtons.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const tabName = (btn as HTMLElement).dataset.tab;
-        
-        // Update tab buttons
-        tabButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        // Show/hide panels
-        const styleManager = document.getElementById(`style-manager-${nestedEditorId}`);
-        const layersContainer = document.getElementById(`layers-container-${nestedEditorId}`);
-        const recordsContainer = document.getElementById(`records-${nestedEditorId}`);
-        
-        if (styleManager && layersContainer && recordsContainer) {
-          if (tabName === 'properties') {
-            styleManager.style.display = 'block';
-            layersContainer.style.display = 'none';
-            recordsContainer.style.display = 'none';
-          } else if (tabName === 'objects') {
-            styleManager.style.display = 'none';
-            layersContainer.style.display = 'block';
-            recordsContainer.style.display = 'none';
-          } else if (tabName === 'records') {
-            styleManager.style.display = 'none';
-            layersContainer.style.display = 'none';
-            recordsContainer.style.display = 'block';
-          }
-        }
-      });
-    });
-    
-    // Set up nested table selector event listener
-    const tableSelector = nestedEditorContainerRef.current.querySelector('.nested-table-select') as HTMLSelectElement;
-    if (tableSelector) {
-      tableSelector.addEventListener('change', (e) => {
-        const newSelectedTable = (e.target as HTMLSelectElement).value;
-        
-        // We'll update the records view in the nested editor with the selected table
-        // This is a simplified approach - in a real implementation, you might want to
-        // make a separate API call and render the nested records view
-        
-        // For now, just update the main selected table which will trigger the useEffect
-        setSelectedTable(newSelectedTable);
-      });
-    }
-  }
-  
-  // Helper function to render tree nodes as HTML string for the nested editor
-  function renderTreeNodeHtml(node: TreeNode, level: number = 0): string {
-    const isExpanded = expandedKeys.has(node.key);
-    const paddingLeft = level * 20;
-    
-    let html = `
-      <div class="tree-node">
-        <div class="tree-node-content" style="padding-left: ${paddingLeft}px;">
-    `;
-    
-    if (node.children.length > 0) {
-      html += `
-        <span class="expand-icon ${isExpanded ? 'expanded' : ''}">
-          ${isExpanded ? '▼' : '►'}
-        </span>
       `;
-    } else {
-      html += `<span class="leaf-icon">•</span>`;
-    }
-    
-    html += `
-      <span class="node-label">${node.label}</span>
-      ${node.isLeaf && node.value !== null ? `<span class="node-value">${node.value}</span>` : ''}
-    </div>
-    `;
-    
-    if (isExpanded && node.children.length > 0) {
-      html += `<div class="tree-node-children">`;
-      node.children.forEach(childNode => {
-        html += renderTreeNodeHtml(childNode, level + 1);
-      });
-      html += `</div>`;
-    }
-    
-    html += `</div>`;
-    return html;
-  }
-  
-  // Clean up frameContent to ensure it's valid HTML content
-  let contentToUse = frameContent.trim();
-  
-  // If nothing is found, use empty content instead of breaking the editor
-  if (!contentToUse) {
-    contentToUse = '<div style="min-height: 50px;"></div>';
-  }
-  
-  // Check for cached content from previous editing session
-  const cachedHtml = sessionStorage.getItem(`frame-content-${frameId}-html`);
-  if (cachedHtml) {
-    contentToUse = cachedHtml;
-  }
-  
-  // Initialize the nested editor
-  const nestedEditor = initializeEditor(nestedEditorId, contentToUse, frameId);
-  
-  // Add double-click handler to make frame component editing work properly 
-  nestedEditor.on('component:dblclick', (component: any) => {
-    if (component.get('type') === 'frame') {
-      nestedEditor.runCommand('frame-edit', { frameComponent: component });
-    }
-  });
-  
-  // Set up auto-save to prevent loss of content
-  const autoSaveInterval = setInterval(() => {
-    try {
-      const currentHtml = nestedEditor.getHtml();
-      const currentCss = nestedEditor.getCss();
-      sessionStorage.setItem(`frame-content-${frameId}-html`, currentHtml);
-      sessionStorage.setItem(`frame-content-${frameId}-css`, currentCss);
-    } catch (err) {
-      console.warn('Auto-save failed:', err);
-    }
-  }, 5000); // Save every 5 seconds
-  
-  // Load any cached CSS
-  const cachedCss = sessionStorage.getItem(`frame-content-${frameId}-css`);
-  if (cachedCss) {
-    // Use the correct method to add CSS rules
-    nestedEditor.Css.addRules(cachedCss);
-  }
-  
-  // Keep track of this new editor instance
-  setEditorInstances(prev => [
-    ...prev, 
-    { 
-      id: nestedEditorId, 
-      editor: nestedEditor, 
-      containerEl: nestedEditorContainerRef.current as HTMLElement,
-      parentFrameId: frameId,
-      autoSaveInterval
-    }
-  ]);
-  
-  // Update the active editor index
-  setActiveEditorIndex(prev => prev + 1);
-  
-  // Update breadcrumbs
-  setEditorBreadcrumbs(prev => [...prev, `Frame ${prev.length}`]);
-  
-  // Show the nested editor
-  setShowNestedEditor(true);
-};
-
-  // Return to parent editor and sync changes
-  // The main issue is in the returnToParentEditor function
-// Here's the fixed implementation for that function:
-
-// Enhanced and fixed returnToParentEditor function with robust error handling
-const returnToParentEditor = () => {
-  if (activeEditorIndex <= 0) {
-    // Already at the root editor, nothing to do
-    return;
-  }
-  
-  try {
-    // Get the current and parent editor instances
-    const currentEditorInstance = editorInstances[activeEditorIndex];
-    const parentEditorIndex = activeEditorIndex - 1;
-    const parentEditorInstance = editorInstances[parentEditorIndex];
-    
-    if (currentEditorInstance && parentEditorInstance) {
-      // Get the current editor content
-      const currentEditor = currentEditorInstance.editor;
-      const frameId = currentEditorInstance.parentFrameId;
       
-      if (!frameId) {
-        console.error("Missing parent frame ID");
-        throw new Error("Missing parent frame ID");
-      }
-      
-      // Get the parent editor instance
-      const parentEditor = parentEditorInstance.editor;
-      
-      // Find the corresponding frame component in the parent editor
-      let parentFrame: any = null;
-      parentEditor.getComponents().forEach((component: any) => {
-        if (component.get('type') === 'frame') {
-          const attrs = component.getAttributes();
-          if (attrs && attrs['data-frame-id'] === frameId) {
-            parentFrame = component;
-          }
-        }
-      });
-      
-      if (!parentFrame) {
-        // Try a deeper search if not found at the top level
-        parentEditor.getComponents().forEach((component: any) => {
-          if (!parentFrame) {
-            findFrameDeep(component);
+      // Set up tab switching in the nested editor
+      const tabButtons = nestedEditorContainerRef.current.querySelectorAll('.tab-btn');
+      tabButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const tabName = (btn as HTMLElement).dataset.tab;
+          
+          // Update tab buttons
+          tabButtons.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          
+          // Show/hide panels
+          const styleManager = document.getElementById(`style-manager-${nestedEditorId}`);
+          const layersContainer = document.getElementById(`layers-container-${nestedEditorId}`);
+          const recordsContainer = document.getElementById(`records-${nestedEditorId}`);
+          
+          if (styleManager && layersContainer && recordsContainer) {
+            if (tabName === 'properties') {
+              styleManager.style.display = 'block';
+              layersContainer.style.display = 'none';
+              recordsContainer.style.display = 'none';
+            } else if (tabName === 'objects') {
+              styleManager.style.display = 'none';
+              layersContainer.style.display = 'block';
+              recordsContainer.style.display = 'none';
+            } else if (tabName === 'records') {
+              styleManager.style.display = 'none';
+              layersContainer.style.display = 'none';
+              recordsContainer.style.display = 'block';
+            }
           }
         });
+      });
+      
+      // Set up nested table selector event listener
+      const tableSelector = nestedEditorContainerRef.current.querySelector('.nested-table-select') as HTMLSelectElement;
+      if (tableSelector) {
+        tableSelector.addEventListener('change', (e) => {
+          const newSelectedTable = (e.target as HTMLSelectElement).value;
+          setSelectedTable(newSelectedTable);
+        });
+      }
+    }
+    
+    // Helper function to render tree nodes as HTML string for the nested editor
+    function renderTreeNodeHtml(node: TreeNode, level: number = 0): string {
+      const isExpanded = expandedKeys.has(node.key);
+      const paddingLeft = level * 20;
+      
+      let html = `
+        <div class="tree-node">
+          <div class="tree-node-content" style="padding-left: ${paddingLeft}px;">
+      `;
+      
+      if (node.children.length > 0) {
+        html += `
+          <span class="expand-icon ${isExpanded ? 'expanded' : ''}">
+            ${isExpanded ? '▼' : '►'}
+          </span>
+        `;
+      } else {
+        html += `<span class="leaf-icon">•</span>`;
+      }
+      
+      html += `
+        <span class="node-label">${node.label}</span>
+        ${node.isLeaf && node.value !== null ? `<span class="node-value">${node.value}</span>` : ''}
+      </div>
+      `;
+      
+      if (isExpanded && node.children.length > 0) {
+        html += `<div class="tree-node-children">`;
+        node.children.forEach(childNode => {
+          html += renderTreeNodeHtml(childNode, level + 1);
+        });
+        html += `</div>`;
+      }
+      
+      html += `</div>`;
+      return html;
+    }
+    
+    // Clean up frameContent to ensure it's valid HTML content
+    let contentToUse = frameContent.trim();
+    
+    // If nothing is found, use empty content instead of breaking the editor
+    if (!contentToUse) {
+      contentToUse = '<div style="min-height: 50px;"></div>';
+    }
+    
+    // Check for cached content from previous editing session
+    const cachedHtml = sessionStorage.getItem(`frame-content-${frameId}-html`);
+    if (cachedHtml) {
+      contentToUse = cachedHtml;
+    }
+    
+    // Create custom editor configuration that simulates the frame's dimensions
+    const editorConfig = {
+      container: `#${nestedEditorId}`,
+      height: "100%",
+      width: "100%", 
+      fromElement: false,
+      storageManager: { autoload: false },
+      
+      // Use relative positioning for the frame editor to match the frame context
+      dragMode: 'absolute' as const,
+      deviceManager: { devices: [] },
+      
+      // Configure canvas to match frame dimensions
+      canvas: {
+        styles: [],
+        scripts: [],
+        // Important: Set the frame size to match the parent frame
+        frameStyle: frameDimensions ? `
+          :root { 
+            box-sizing: border-box;
+          }
+          html, body { 
+            margin: 0; 
+            padding: 0;
+            width: 100%;
+            height: 100%;
+          }
+        ` : '',
+      },
+      
+      // Block manager configuration (kept from main editor)
+      blockManager: {
+        appendTo: `#blocks-${nestedEditorId}`,
+        blocks: [
+          {
+            id: 'text',
+            label: 'Text Box',
+            category: 'Basic',
+            content: {
+              type: 'text',
+              content: 'Insert your text here',
+              style: { padding: '10px', minHeight: '50px' }
+            },
+            media: '<i class="fa fa-text-width"></i>'
+          },
+          {
+            id: 'heading',
+            label: 'Heading',
+            category: 'Basic',
+            content: {
+              type: 'text',
+              content: '<h1>Heading</h1>',
+              style: { padding: '10px', minHeight: '50px' }
+            },
+            media: '<i class="fa fa-header"></i>'
+          },
+          {
+            id: 'image',
+            label: 'Image',
+            category: 'Basic',
+            select: true,
+            content: { type: 'image' },
+            media: '<i class="fa fa-image"></i>'
+          },
+          {
+            id: 'table',
+            label: 'Table',
+            category: 'Structure',
+            content: {
+              type: 'table',
+              style: { width: '100%' },
+              components: [
+                {
+                  type: 'thead',
+                  components: [
+                    {
+                      type: 'row',
+                      components: [
+                        { type: 'cell', content: 'Header 1', tagName: 'th' },
+                        { type: 'cell', content: 'Header 2', tagName: 'th' },
+                        { type: 'cell', content: 'Header 3', tagName: 'th' }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  type: 'tbody',
+                  components: [
+                    {
+                      type: 'row',
+                      components: [
+                        { type: 'cell', content: 'Cell 1' },
+                        { type: 'cell', content: 'Cell 2' },
+                        { type: 'cell', content: 'Cell 3' }
+                      ]
+                    },
+                    {
+                      type: 'row',
+                      components: [
+                        { type: 'cell', content: 'Cell 4' },
+                        { type: 'cell', content: 'Cell 5' },
+                        { type: 'cell', content: 'Cell 6' }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            media: '<i class="fa fa-table"></i>'
+          },
+          {
+            id: 'frame',
+            label: 'Frame',
+            category: 'Structure',
+            content: {
+              type: 'frame',
+              style: { 
+                padding: '20px',
+                minHeight: '100px',
+                backgroundColor: '#e8f4fc',
+                border: '1px dashed #3498db'
+              }
+            },
+            media: '<i class="fa fa-window-maximize"></i>'
+          }
+        ]
+      },
+      
+      // Configure panels with save and export buttons
+      panels: {
+        defaults: [
+          {
+            id: 'panel-top',
+            el: `.panel-top-${nestedEditorId}`,
+            buttons: [
+              {
+                id: 'save',
+                className: 'btn-save',
+                label: 'Save',
+                command: 'save-page',
+              }
+            ],
+          }
+        ]
+      },
+      
+      // Enable style manager
+      styleManager: {
+        appendTo: `#style-manager-${nestedEditorId}`,
+        sectors: [
+          {
+            name: 'Typography',
+            open: false,
+            buildProps: ['font-family', 'font-size', 'font-weight', 'letter-spacing', 'color', 'text-align', 'text-shadow', 'line-height']
+          },
+          {
+            name: 'Dimension',
+            open: false,
+            buildProps: ['width', 'height', 'max-width', 'min-height', 'margin', 'padding']
+          },
+          {
+            name: 'Decorations',
+            open: false,
+            buildProps: ['background-color', 'border', 'border-radius', 'box-shadow']
+          },
+          {
+            name: 'Position',
+            open: false,
+            buildProps: ['position', 'top', 'left', 'bottom', 'right']
+          }
+        ]
+      },
+
+      // Enable layer manager
+      layerManager: {
+        appendTo: `#layers-container-${nestedEditorId}`
+      },
+      
+      // Use plugins
+      plugins: [],
+      
+      // Start with the provided content or empty
+      components: contentToUse,
+    };
+    
+    // Initialize the nested editor with the frame-specific configuration
+    const nestedEditor = grapesjs.init(editorConfig);
+    
+    // Add save command
+    nestedEditor.Commands.add("save-page", {
+      run(editor) {
+        const currentHtml = editor.getHtml();
+        const currentCss = editor.getCss();
+        sessionStorage.setItem(`frame-content-${frameId}-html`, currentHtml);
+        if (currentCss) {
+          sessionStorage.setItem(`frame-content-${frameId}-css`, currentCss);
+        }
         
-        // Helper function to recursively search for the frame
-        function findFrameDeep(component: any) {
+        // Update frame content preview
+        try {
+          // Get dimensions of the content to potentially resize the frame
+          updateFrameDimensions(editor);
+        } catch (error) {
+          console.error("Error updating frame dimensions:", error);
+        }
+      },
+    });
+    
+    // Function to calculate and update frame dimensions based on content
+    const updateFrameDimensions = (editor: any) => {
+      if (!frameDimensions?.autoHeight) return;
+      
+      try {
+        // Get the canvas document and body
+        const canvas = editor.Canvas.getDocument();
+        if (!canvas || !canvas.body) return;
+        
+        // Get the actual height of the content
+        const contentHeight = canvas.body.scrollHeight;
+        
+        // Display the content height
+        const frameHeightDisplay = document.querySelector('.frame-height');
+        if (frameHeightDisplay) {
+          const heightWithUnit = contentHeight + 'px';
+          frameHeightDisplay.textContent = heightWithUnit;
+          
+          // Update the frame preview wrapper to match the content height
+          const framePreviewWrapper = document.querySelector('.frame-preview-wrapper');
+          if (framePreviewWrapper) {
+            (framePreviewWrapper as HTMLElement).style.height = heightWithUnit;
+          }
+        }
+      } catch (error) {
+        console.error("Error calculating content dimensions:", error);
+      }
+    };
+    
+    // Monitor changes to update dimensions if auto-height is enabled
+    if (frameDimensions?.autoHeight) {
+      nestedEditor.on('component:update', () => {
+        setTimeout(() => updateFrameDimensions(nestedEditor), 100);
+      });
+      
+      nestedEditor.on('canvas:drop', () => {
+        setTimeout(() => updateFrameDimensions(nestedEditor), 100);
+      });
+    }
+    
+    // Add double-click handler to make frame component editing work properly 
+    nestedEditor.on('component:dblclick', (component: any) => {
+      if (component.get('type') === 'frame') {
+        nestedEditor.runCommand('frame-edit', { frameComponent: component });
+      }
+    });
+    
+    // Set up auto-save to prevent loss of content
+    const autoSaveInterval = setInterval(() => {
+      try {
+        const currentHtml = nestedEditor.getHtml();
+        const currentCss = nestedEditor.getCss();
+        sessionStorage.setItem(`frame-content-${frameId}-html`, currentHtml);
+        if (currentCss) {
+          sessionStorage.setItem(`frame-content-${frameId}-css`, currentCss);
+        }
+        
+        // Also save frame dimensions if auto-height is enabled
+        if (frameDimensions?.autoHeight) {
+          updateFrameDimensions(nestedEditor);
+        }
+      } catch (err) {
+        console.warn('Auto-save failed:', err);
+      }
+    }, 5000); // Save every 5 seconds
+    
+    // Load any cached CSS
+    const cachedCss = sessionStorage.getItem(`frame-content-${frameId}-css`);
+    if (cachedCss) {
+      // Use the correct method to add CSS rules
+      nestedEditor.Css.addRules(cachedCss);
+    }
+    
+    // Keep track of this new editor instance
+    setEditorInstances(prev => [
+      ...prev, 
+      { 
+        id: nestedEditorId, 
+        editor: nestedEditor, 
+        containerEl: nestedEditorContainerRef.current as HTMLElement,
+        parentFrameId: frameId,
+        autoSaveInterval,
+        frameDimensions
+      }
+    ]);
+    
+    // Update the active editor index
+    setActiveEditorIndex(prev => prev + 1);
+    
+    // Update breadcrumbs
+    setEditorBreadcrumbs(prev => [...prev, `Frame ${prev.length}`]);
+    
+    // Show the nested editor
+    setShowNestedEditor(true);
+    
+    // Initialize frame dimensions display
+    setTimeout(() => updateFrameDimensions(nestedEditor), 500);
+  };
+
+  // Enhanced and fixed returnToParentEditor function with robust error handling
+  const returnToParentEditor = () => {
+    if (activeEditorIndex <= 0) {
+      // Already at the root editor, nothing to do
+      return;
+    }
+    
+    try {
+      // Get the current and parent editor instances
+      const currentEditorInstance = editorInstances[activeEditorIndex];
+      const parentEditorIndex = activeEditorIndex - 1;
+      const parentEditorInstance = editorInstances[parentEditorIndex];
+      
+      if (currentEditorInstance && parentEditorInstance) {
+        // Get the current editor content
+        const currentEditor = currentEditorInstance.editor;
+        const frameId = currentEditorInstance.parentFrameId;
+        const frameDimensions = currentEditorInstance.frameDimensions;
+        
+        if (!frameId) {
+          console.error("Missing parent frame ID");
+          throw new Error("Missing parent frame ID");
+        }
+        
+        // Get the parent editor instance
+        const parentEditor = parentEditorInstance.editor;
+        
+        // Find the corresponding frame component in the parent editor
+        let parentFrame: any = null;
+        parentEditor.getComponents().forEach((component: any) => {
           if (component.get('type') === 'frame') {
             const attrs = component.getAttributes();
             if (attrs && attrs['data-frame-id'] === frameId) {
               parentFrame = component;
-              return;
             }
           }
-          
-          component.components().forEach((child: any) => {
+        });
+        
+        if (!parentFrame) {
+          // Try a deeper search if not found at the top level
+          parentEditor.getComponents().forEach((component: any) => {
             if (!parentFrame) {
-              findFrameDeep(child);
+              findFrameDeep(component);
             }
           });
-        }
-      }
-      
-      if (parentFrame) {
-        // Store the frame's important properties
-        const originalStyle = parentFrame.getStyle();
-        const originalAttributes = parentFrame.getAttributes();
-        
-        try {
-          // Get HTML content from the current editor
-          const frameHtml = currentEditor.getHtml();
-          console.log('Frame HTML content:', frameHtml);
           
-          // IMPORTANT: Always clear & add content to avoid content disappearing
-          // This is the critical fix for the disappearing content issue
-          
-          // First, clear existing components within the frame
-          parentFrame.components().reset();
-          
-          // Then create a temporary DOM element to parse the HTML
-          const tempEl = document.createElement('div');
-          tempEl.innerHTML = frameHtml;
-          
-          // Add each child node from the parsed HTML as a component
-          Array.from(tempEl.childNodes).forEach((node: any) => {
-            if (node.nodeType === 1) { // Element node
-              try {
-                const componentHtml = (node as HTMLElement).outerHTML;
-                console.log('Adding component:', componentHtml);
-                parentFrame.components().add(componentHtml);
-              } catch (componentError) {
-                console.error('Error adding component:', componentError);
-                console.error('Problematic node:', node);
+          // Helper function to recursively search for the frame
+          function findFrameDeep(component: any) {
+            if (component.get('type') === 'frame') {
+              const attrs = component.getAttributes();
+              if (attrs && attrs['data-frame-id'] === frameId) {
+                parentFrame = component;
+                return;
               }
             }
-          });
-          
-          // If no content was added (empty frame), add a placeholder div
-          if (parentFrame.components().length === 0) {
-            console.log('No components added, creating placeholder');
-            parentFrame.components().add({
-              type: 'default',
-              content: '',
-              style: { minHeight: '50px' }
+            
+            component.components().forEach((child: any) => {
+              if (!parentFrame) {
+                findFrameDeep(child);
+              }
             });
           }
-          
-          // Make sure the frame keeps its original styles and attributes
-          parentFrame.setStyle(originalStyle);
-          parentFrame.setAttributes(originalAttributes);
-          
-          // Get CSS from the current editor and apply unique styles to parent editor
-          const frameCss = currentEditor.getCss();
-          console.log('Frame CSS content:', frameCss);
-          
-          if (frameCss) {
-            const parentCss = parentEditor.getCss();
-            const uniqueCss = frameCss.split('\n')
-              .filter((line: string) => !parentCss.includes(line))
-              .join('\n');
-              
-            if (uniqueCss.trim()) {
-              console.log('Adding unique CSS:', uniqueCss);
-              // Use the correct method to add CSS rules
-              parentEditor.Css.addRules(uniqueCss);
-            }
-          }
-          
-          // Select the frame in the parent editor
-          parentEditor.select(parentFrame);
-        } catch (error) {
-          console.error("Detailed error updating frame content:", error);
-          console.error("Frame HTML content:", currentEditor.getHtml());
-          console.error("Frame CSS content:", currentEditor.getCss());
-          alert("There was an error updating the frame content. The frame may be empty or contain invalid content. Check the console for details.");
-          
-          // Restore empty frame with original properties as a fallback
-          parentFrame.components().reset();
-          parentFrame.setStyle(originalStyle);
-          parentFrame.setAttributes(originalAttributes);
         }
-      } else {
-        console.error("Could not find parent frame component");
-        alert("Could not find the parent frame. Changes may not be saved.");
+        
+        if (parentFrame) {
+          // Store the frame's important properties
+          const originalStyle = { ...parentFrame.getStyle() };
+          const originalAttributes = { ...parentFrame.getAttributes() };
+          const autoHeight = originalAttributes['data-auto-height'] === 'true';
+          
+          try {
+            // Get HTML content from the current editor
+            const frameHtml = currentEditor.getHtml();
+            console.log('Frame HTML content:', frameHtml);
+            
+            // First, clear existing components within the frame
+            parentFrame.components().reset();
+            
+            // Then create a temporary DOM element to parse the HTML
+            const tempEl = document.createElement('div');
+            tempEl.innerHTML = frameHtml;
+            
+            // Add each child node from the parsed HTML as a component
+            Array.from(tempEl.childNodes).forEach((node: any) => {
+              if (node.nodeType === 1) { // Element node
+                try {
+                  const componentHtml = (node as HTMLElement).outerHTML;
+                  console.log('Adding component:', componentHtml);
+                  parentFrame.components().add(componentHtml);
+                } catch (componentError) {
+                  console.error('Error adding component:', componentError);
+                  console.error('Problematic node:', node);
+                }
+              }
+            });
+            
+            // If no content was added (empty frame), add a placeholder div
+            if (parentFrame.components().length === 0) {
+              console.log('No components added, creating placeholder');
+              parentFrame.components().add({
+                type: 'default',
+                content: '',
+                style: { minHeight: '50px' }
+              });
+            }
+            
+            // Handle auto-resize of frame based on content height if auto-height is enabled
+            if (autoHeight && frameDimensions) {
+              try {
+                // Get the height from the frame dimensions display
+                const frameHeightEl = document.querySelector('.frame-height');
+                if (frameHeightEl && frameHeightEl.textContent) {
+                  const contentHeight = frameHeightEl.textContent;
+                  if (contentHeight && contentHeight !== 'auto') {
+                    // Update the original style with the new height
+                    originalStyle.height = contentHeight;
+                    console.log(`Auto-resizing frame to height: ${contentHeight}`);
+                  }
+                }
+              } catch (resizeError) {
+                console.error('Error auto-resizing frame:', resizeError);
+              }
+            }
+            
+            // Make sure the frame keeps its original styles and attributes
+            parentFrame.setStyle(originalStyle);
+            parentFrame.setAttributes(originalAttributes);
+            
+            // Get CSS from the current editor and apply unique styles to parent editor
+            const frameCss = currentEditor.getCss();
+            console.log('Frame CSS content:', frameCss);
+            
+            if (frameCss) {
+              const parentCss = parentEditor.getCss();
+              const uniqueCss = frameCss.split('\n')
+                .filter((line: string) => !parentCss.includes(line))
+                .join('\n');
+                
+              if (uniqueCss.trim()) {
+                console.log('Adding unique CSS:', uniqueCss);
+                // Use the correct method to add CSS rules
+                parentEditor.Css.addRules(uniqueCss);
+              }
+            }
+            
+            // Select the frame in the parent editor
+            parentEditor.select(parentFrame);
+          } catch (error) {
+            console.error("Detailed error updating frame content:", error);
+            console.error("Frame HTML content:", currentEditor.getHtml());
+            console.error("Frame CSS content:", currentEditor.getCss());
+            alert("There was an error updating the frame content. The frame may be empty or contain invalid content. Check the console for details.");
+            
+            // Restore empty frame with original properties as a fallback
+            parentFrame.components().reset();
+            parentFrame.setStyle(originalStyle);
+            parentFrame.setAttributes(originalAttributes);
+          }
+        } else {
+          console.error("Could not find parent frame component");
+          alert("Could not find the parent frame. Changes may not be saved.");
+        }
+        
+        // Clean up the auto-save interval if it exists
+        if (currentEditorInstance.autoSaveInterval) {
+          clearInterval(currentEditorInstance.autoSaveInterval);
+        }
       }
-      
-      // Clean up the auto-save interval if it exists
-      if (currentEditorInstance.autoSaveInterval) {
-        clearInterval(currentEditorInstance.autoSaveInterval);
-      }
+    } catch (error) {
+      console.error("Error returning to parent editor:", error);
+      alert("There was an error returning to the parent editor. Please try again.");
     }
-  } catch (error) {
-    console.error("Error returning to parent editor:", error);
-    alert("There was an error returning to the parent editor. Please try again.");
-  }
-  
-  // Update the active editor index
-  setActiveEditorIndex(activeEditorIndex - 1);
-  
-  // Update breadcrumbs
-  setEditorBreadcrumbs(prev => prev.slice(0, -1));
-  
-  // If we're back at the main editor, hide the nested editor
-  if (activeEditorIndex - 1 === 0) {
-    setShowNestedEditor(false);
-  }
-};
+    
+    // Update the active editor index
+    setActiveEditorIndex(activeEditorIndex - 1);
+    
+    // Update breadcrumbs
+    setEditorBreadcrumbs(prev => prev.slice(0, -1));
+    
+    // If we're back at the main editor, hide the nested editor
+    if (activeEditorIndex - 1 === 0) {
+      setShowNestedEditor(false);
+    }
+  };
 
   // Initialize the main editor
   useEffect(() => {
