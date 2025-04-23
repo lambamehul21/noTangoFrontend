@@ -9,7 +9,7 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #201f1f;
   line-height: 1.6;
-  background-color: #a1caf5;
+  background-color: #ffffff;
 }
 
 .editor-container {
@@ -17,7 +17,7 @@ body {
   flex-direction: column;
   height: 100vh;
   width: 100%;
-  background-color: #a1caf5;
+  background-color: #ffffff;
 }
 
 /* Top Panel Styling */
@@ -42,9 +42,52 @@ body {
   color: #201f1f;
 }
 
-.panel-buttons {
+/* Breadcrumb navigation */
+.editor-breadcrumbs {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  padding: 8px 15px;
+  background-color: #f0f2f5;
+  border-bottom: 1px solid #ddd;
+  font-size: 14px;
+  color: #2c3e50;
+  overflow-x: auto;
+  white-space: nowrap;
+  gap: 16px;
+}
+
+.breadcrumb-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.breadcrumb-separator {
+  margin: 0 8px;
+  color: #95a5a6;
+}
+
+.breadcrumb-text {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.breadcrumb-text:hover {
+  background-color: #e9ecef;
+  color: #3498db;
+}
+
+.breadcrumb-text.active {
+  font-weight: 600;
+  color: #3498db;
+  background-color: #e8f4fc;
+}
+
+.breadcrumb-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .btn-save, .btn-export {
@@ -78,12 +121,31 @@ body {
   background-color: #0873c4;
 }
 
+.back-to-parent {
+  margin-left: auto;
+  padding: 6px 12px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.back-to-parent:hover {
+  background-color: #2980b9;
+}
+
 /* Main Editor Area Styling */
 .editor-main {
   display: flex;
   flex: 1;
   overflow: hidden;
-  background-color: #c0d9f7;
+  background-color: #ffffff;
 }
 
 /* Left Sidebar - Block Manager */
@@ -153,14 +215,14 @@ body {
 /* Central Canvas */
 .editor-canvas {
   flex: 1;
-  background-color: #a1caf5;
+  background-color: #ffffff;
   overflow: auto;
   padding: 20px;
 }
 
 /* GrapeJS specific overrides */
 .gjs-cv-canvas {
-  background-color: #a1caf5;
+  background-color: #ffffff;
 }
 
 .gjs-pn-panel {
@@ -647,6 +709,8 @@ body {
 .tree-node-content.dragging {
   opacity: 0.5;
   background-color: #e6f2ff;
+  border: 1px dashed #4d94ff;
+  cursor: grabbing;
 }
 
 .expand-icon {
@@ -687,14 +751,27 @@ body {
 }
 
 /* Drop zone styling */
-.gjs-text-component.drop-zone {
+.gjs-frame .gjs-selected {
+  outline: 2px solid #3498db !important;
+}
+
+.gjs-frame.dragover {
   outline: 2px dashed #4d94ff;
-  outline-offset: 2px;
   background-color: rgba(77, 148, 255, 0.05);
+}
+
+/* Drag cursor styling */
+[draggable=true] {
+  cursor: grab;
+}
+
+[draggable=true]:active {
+  cursor: grabbing;
 }
 
 /* Drag preview styling */
 .drag-preview {
+  position: fixed;
   padding: 8px 12px;
   background-color: #ffffff;
   border: 1px solid #4d94ff;
@@ -703,6 +780,25 @@ body {
   pointer-events: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   opacity: 0.9;
+  z-index: 9999;
+}
+
+/* Record elements styling */
+.record-element {
+  padding: 10px;
+  background-color: #f8f9fa;
+  border: 1px solid #cce0ff;
+  border-radius: 4px;
+  min-height: 30px;
+  min-width: 100px;
+}
+
+.record-element:hover {
+  border-color: #4d94ff;
+}
+
+.record-element.gjs-selected {
+  outline: 2px solid #4d94ff !important;
 }
 
 /* Remove component expansion styles */
@@ -887,212 +983,6 @@ to { opacity: 1; }
 .nested-editor-main {
 animation: fadeIn 0.3s ease;
 }
-/* Additional styles for nested editing functionality */
-
-/* Frame component styling */
-.gjs-frame-component {
-position: relative;
-background-color: #e8f4fc;
-border: 1px dashed #3498db;
-border-radius: 4px;
-padding: 20px;
-min-height: 100px;
-}
-
-.gjs-frame-component::before {
-content: '';
-position: absolute;
-top: 0;
-right: 0;
-background-color: #3498db;
-color: white;
-padding: 2px 4px;
-font-size: 10px;
-border-radius: 0 0 0 4px;
-opacity: 0.7;
-}
-
-.gjs-frame-component:hover::before {
-content: 'Double-click to edit';
-opacity: 1;
-}
-
-/* Breadcrumb navigation */
-.editor-breadcrumbs {
-display: flex;
-align-items: center;
-padding: 8px 15px;
-background-color: #f0f2f5;
-border-bottom: 1px solid #ddd;
-font-size: 14px;
-color: #2c3e50;
-overflow-x: auto;
-white-space: nowrap;
-}
-
-.breadcrumb-item {
-display: inline-flex;
-align-items: center;
-}
-
-.breadcrumb-separator {
-margin: 0 8px;
-color: #95a5a6;
-}
-
-.breadcrumb-text {
-cursor: pointer;
-padding: 4px 8px;
-border-radius: 3px;
-transition: all 0.2s ease;
-}
-
-.breadcrumb-text:hover {
-background-color: #e9ecef;
-color: #3498db;
-}
-
-.breadcrumb-text.active {
-font-weight: 600;
-color: #3498db;
-background-color: #e8f4fc;
-}
-
-.back-to-parent {
-margin-left: auto;
-padding: 6px 12px;
-background-color: #3498db;
-color: white;
-border: none;
-border-radius: 3px;
-cursor: pointer;
-font-size: 13px;
-display: flex;
-align-items: center;
-gap: 6px;
-transition: all 0.2s ease;
-}
-
-.back-to-parent:hover {
-background-color: #2980b9;
-}
-
-/* Nested editor container */
-.nested-editor-main {
-display: flex;
-flex: 1;
-height: calc(100vh - 100px); /* Adjust based on top panel and breadcrumb heights */
-overflow: hidden;
-background-color: #fff;
-}
-
-.nested-editor-container {
-display: flex;
-flex: 1;
-height: 100%;
-}
-
-/* Nested editor structure - replica of the main editor layout */
-.nested-editor-structure {
-display: flex;
-flex: 1;
-overflow: hidden;
-height: 100%;
-}
-
-.nested-editor-structure .panel-left,
-.nested-editor-structure .panel-right {
-width: 220px;
-background-color: #f8f9fa;
-border-right: 1px solid #e5e8ec;
-display: flex;
-flex-direction: column;
-overflow: hidden;
-}
-
-.nested-editor-structure .panel-right {
-border-right: none;
-border-left: 1px solid #e5e8ec;
-}
-
-.nested-editor-structure .editor-canvas {
-flex: 1;
-background-color: #ffffff;
-box-shadow: 0 0 10px rgba(0,0,0,0.05) inset;
-overflow: auto;
-}
-
-/* Hide the main editor when showing nested editor */
-.editor-main.hidden {
-display: none;
-}
-
-.nested-editor-main.hidden {
-display: none;
-}
-
-/* Frame component toolbar */
-.gjs-toolbar {
-background-color: #2c3e50;
-border-radius: 3px;
-}
-
-.gjs-toolbar-item {
-padding: 5px;
-font-size: 12px;
-}
-
-.gjs-toolbar-item:hover {
-background-color: #3498db;
-}
-
-/* Visual cue for frame components */
-.gjs-frame {
-position: relative;
-}
-
-.gjs-frame::after {
-content: '';
-position: absolute;
-top: 0;
-right: 0;
-bottom: 0;
-left: 0;
-border: 2px dashed #3498db;
-pointer-events: none;
-opacity: 0;
-transition: opacity 0.2s ease;
-}
-
-.gjs-frame:hover::after {
-opacity: 1;
-}
-
-/* Higher z-index for toolbar on frames */
-.gjs-toolbar.gjs-one-bg.frame-toolbar {
-z-index: 100;
-}
-
-/* Panel buttons for nested editor */
-.panel-top-nested-editor {
-display: flex;
-justify-content: space-between;
-align-items: center;
-padding: 8px 15px;
-background-color: #1a2a3a;
-color: #f8f9fa;
-border-bottom: 1px solid #34495e;
-}
-
-/* Animation for transitioning between editors */
-@keyframes fadeIn {
-from { opacity: 0; }
-to { opacity: 1; }
-}
-
-.nested-editor-main {
-animation: fadeIn 0.3s ease;
-}
 
 /* Additional styles for nested editor frame preview */
 .editor-canvas-container {
@@ -1101,7 +991,7 @@ animation: fadeIn 0.3s ease;
   flex: 1;
   position: relative;
   overflow: auto;
-  background-color: #f0f7ff;
+  background-color: #ffffff;
   padding: 20px;
 }
 
@@ -1176,4 +1066,204 @@ animation: fadeIn 0.3s ease;
   background-color: rgba(52, 152, 219, 0.05);
   pointer-events: none;
   z-index: 1;
+}
+
+/* Nested editor structure - replica of the main editor layout */
+.nested-editor-structure {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
+
+.nested-editor-structure .panel-left,
+.nested-editor-structure .panel-right {
+  width: 220px;
+  background-color: #f8f9fa;
+  border-right: 1px solid #e5e8ec;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nested-editor-structure .panel-right {
+  border-right: none;
+  border-left: 1px solid #e5e8ec;
+}
+
+.nested-editor-structure .editor-canvas {
+  flex: 1;
+  background-color: #ffffff;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05) inset;
+  overflow: auto;
+}
+.page-manager-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #2d2d2d;
+  border-top: 1px solid #444;
+  padding: 10px;
+  z-index: 1000;
+}
+
+.page-list {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  overflow-x: auto;
+  padding: 0 10px;
+}
+
+.page-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #3d3d3d;
+  border-radius: 4px;
+  min-width: 150px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.page-item.active {
+  background: #4a4a4a;
+  border: 1px solid #666;
+}
+
+.page-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.page-actions {
+  display: flex;
+  gap: 5px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.page-item:hover .page-actions {
+  opacity: 1;
+}
+
+.page-actions button {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  transition: all 0.3s ease;
+}
+
+.page-actions button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.add-page-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.add-page-btn:hover {
+  background: #45a049;
+}
+
+.editor-main {
+  margin-bottom: 60px; /* Add space for the page manager panel */
+}
+
+/* Preview button styling */
+.btn-preview {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  background-color: #6c5ce7;
+  color: white;
+}
+
+.btn-preview:hover {
+  background-color: #5f4dd3;
+}
+
+.btn-preview:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* PDF Preview Modal */
+.pdf-preview-modal {
+  width: 90%;
+  max-width: 1200px;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-preview-modal .modal-content {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+}
+
+.pdf-preview-modal iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #f5f5f5;
+}
+
+.download-btn {
+  padding: 8px 15px;
+  background-color: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.download-btn:hover {
+  background-color: #219a52;
+}
+
+.pdf-loading {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 20px 40px;
+  border-radius: 8px;
+  font-size: 16px;
+  z-index: 10000;
 }
