@@ -1267,3 +1267,60 @@ animation: fadeIn 0.3s ease;
   font-size: 16px;
   z-index: 10000;
 }
+
+/* Add at the end of styles.css */
+
+.document-placeholder {
+  font-style: italic;
+  color: #6c757d;
+  width: 100%;
+  text-align: center;
+  padding: 20px;
+  cursor: pointer; /* Indicate it's clickable */
+}
+
+.document-viewer-component {
+  /* Ensure it takes up space and content is visible */
+  width: 100%;
+  background-clip: padding-box; /* Ensure background respects padding */
+  overflow: hidden; /* Hide overflow in editor view */
+  /* Transition height changes smoothly if needed */
+  transition: min-height 0.2s ease-in-out;
+}
+
+/* Styling for the actual loaded content inside the viewer */
+.document-viewer-component > div:not(.document-placeholder):not(.loading-document) {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto; /* Allow scrolling within the editor view */
+  padding: 10px; /* Add some padding to content */
+  background-color: #fff; /* White background for content */
+}
+
+.loading-document {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  min-height: 100px; /* Ensure loading text is visible */
+  font-style: italic;
+  color: #495057;
+  background-color: #f8f9fa; /* Match placeholder bg */
+  border-radius: 4px;
+}
+
+/* Basic spinner for loading indicator */
+.pdf-loading .spinner {
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top: 4px solid #fff;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin-right: 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

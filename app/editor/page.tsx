@@ -19,14 +19,19 @@ import {
   faWindowMaximize,
   faTrash,
   faPlus,
-  faDownload
-} from '@fortawesome/free-solid-svg-icons'
+  faDownload,
+  faFileAlt as faFileAltSolid // Renamed to avoid conflict
+} from '@fortawesome/free-solid-svg-icons' 
 // Import jsPDF and html2canvas (you'll need to install these)
 // npm install jspdf html2canvas
 // Also import the file icon from regular set
 // npm install @fortawesome/free-regular-svg-icons
-import { faFileAlt } from '@fortawesome/free-regular-svg-icons'
+import { faFileAlt } from '@fortawesome/free-regular-svg-icons' 
 // You'll need to dynamically import jsPDF and html2canvas in useEffect due to SSR
+import mammoth from 'mammoth'; // Added import
+import sanitizeHtml from 'sanitize-html'; // Added import
+// If using rtf-parser, import it:
+// import { RtfParser } from 'rtf-parser'; 
 
 // Extend the Editor type to include our custom property
 declare module 'grapesjs' {
@@ -183,6 +188,102 @@ const EditorGrapes = () => {
     fetchTableNames();
   }, []);
 
+  // --- Utility Functions ---
+
+  // Utility function to convert RTF to HTML (Placeholder - needs proper implementation)
+  const convertRtfToHtml = async (rtfContent: string): Promise<string> => {
+    console.warn("RTF to HTML conversion needs a proper implementation.");
+    // Example using rtf-parser (requires more logic to build HTML)
+    /*
+    return new Promise((resolve, reject) => {
+      // Requires 'rtf-parser' library
+      const parser = new RtfParser(); 
+      parser.parseString(rtfContent, (err: any, doc: any) => {
+        if (err) {
+           console.error("RTF Parsing Error:", err);
+           reject("Failed to parse RTF.");
+           return;
+        }
+        // --- You need to implement logic here to walk the parsed 'doc' 
+        // --- and build an HTML string based on its structure and formatting.
+        let html = "<p>RTF Content (conversion pending implementation)</p>"; 
+        console.log("Parsed RTF Doc:", doc); // Log the structure to help implementation
+        resolve(html);
+      });
+    });
+    */
+    // Simple placeholder for now, displaying raw content safely:
+    const escapedContent = rtfContent.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return `<div style="font-family: monospace; white-space: pre-wrap; border: 1px solid #ccc; padding: 10px; background: #eee; max-height: 300px; overflow: auto;">${escapedContent.substring(0, 1000)}... <br/><strong>(RTF Preview Pending Implementation)</strong></div>`;
+  };
+
+  // Utility function to sanitize HTML
+  const sanitizeHtmlContent = (html: string): string => {
+    return sanitizeHtml(html, {
+      allowedTags: sanitizeHtml.defaults.allowedTags.concat([ 
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'u', 's', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'img', 'figure', 'figcaption' 
+      ]),
+      allowedAttributes: {
+        ...sanitizeHtml.defaults.allowedAttributes,
+        '*': [ 'style', 'class', 'id', 'title', 'alt' ], // Allow style, class, id, title, alt
+        'a': ['href', 'name', 'target'],
+        'img': ['src', 'srcset', 'alt', 'title', 'width', 'height', 'style'] // Allow image attributes
+      },
+      allowedStyles: {
+        '*': { // Allow more specific styling, be cautious with broad rules
+          'color': [/^#(0x)?[0-9a-f]+$/i, /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i, /^rgba\(.*\)$/i, /^\w+$/],
+          'background-color': [/^#(0x)?[0-9a-f]+$/i, /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i, /^rgba\(.*\)$/i, /^\w+$/, /^transparent$/i],
+          'font-size': [/^\d*\.?\d+(?:px|em|%|pt|rem)$/i],
+          'font-weight': [/^(bold|normal|\d+)$/i],
+          'font-style': [/^(italic|normal)$/i],
+          'font-family': [/^[\s\w,-]+$/],
+          'text-align': [/^(left|right|center|justify)$/i],
+          'text-decoration': [/^(underline|line-through|none)$/i],
+          'padding': [/^\d*\.?\d+(?:px|em|%|pt|rem)?(?:\s+\d*\.?\d+(?:px|em|%|pt|rem)?){0,3}$/i],
+          'margin': [/^\d*\.?\d+(?:px|em|%|pt|rem)?(?:\s+\d*\.?\d+(?:px|em|%|pt|rem)?){0,3}$|^auto$/i],
+          'border': [/.*/], // Allow complex border styles (use with caution)
+          'border-radius': [/^\d*\.?\d+(?:px|em|%|pt|rem)?$/i],
+          'width': [/^\d*\.?\d+(?:px|em|%|pt|rem)?$|^auto$/i],
+          'height': [/^\d*\.?\d+(?:px|em|%|pt|rem)?$|^auto$/i],
+          'line-height': [/^\d*\.?\d+(?:px|em|%|pt|rem)?$|^\d*\.?\d+$/i],
+          'display': [/^(block|inline|inline-block|flex|none)$/i],
+          'position': [/^(relative|absolute|fixed|static|sticky)$/i],
+          'top': [/^\d*\.?\d+(?:px|em|%|pt|rem)?$|^auto$/i],
+          'left': [/^\d*\.?\d+(?:px|em|%|pt|rem)?$|^auto$/i],
+          'bottom': [/^\d*\.?\d+(?:px|em|%|pt|rem)?$|^auto$/i],
+          'right': [/^\d*\.?\d+(?:px|em|%|pt|rem)?$|^auto$/i],
+          'list-style-type': [/^\w+$/i]
+        }
+      },
+       // Allow specific classes if needed (e.g., from mammoth)
+      // allowedClasses: {
+      //   'p': [ 'some-class-from-mammoth' ]
+      // }
+       // Allow self closing tags like <br/>, <img/> etc.
+      selfClosing: [ 'img', 'br', 'hr', 'area', 'base', 'basefont', 'input', 'link', 'meta' ],
+      // Allow protocols for links and images
+      allowedSchemes: [ 'http', 'https', 'ftp', 'mailto', 'tel' ],
+      allowedSchemesByTag: {},
+      allowedSchemesAppliedToAttributes: [ 'href', 'src', 'cite' ],
+      allowProtocolRelative: true,
+      enforceHtmlBoundary: false
+    });
+  };
+
+  // Helper to trigger file download (if needed for export later)
+  const downloadFile = (content: string | Blob, filename: string, mimeType: string) => {
+    const blob = (content instanceof Blob) ? content : new Blob([content], { type: mimeType });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  };
+
+  // --- End Utility Functions ---
+
   // Helper function to initialize a GrapesJS editor
   const initializeEditor = (
     containerId: string, 
@@ -217,14 +318,14 @@ const EditorGrapes = () => {
               content: 'Insert your text here',
               style: { padding: '10px', minHeight: '50px' }
             },
-            media: '<i class="fa fa-text-width"></i>'
+            media: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width: 24px; height: 24px;"><path fill="currentColor" d="M448 64H64C46.3 64 32 78.3 32 96v320c0 17.7 14.3 32 32 32h384c17.7 0 32-14.3 32-32V96c0-17.7-14.3-32-32-32zm-96 96c0 8.8-7.2 16-16 16H176c-8.8 0-16-7.2-16-16s7.2-16 16-16h160c8.8 0 16 7.2 16 16zm48 128c0 8.8-7.2 16-16 16H176c-8.8 0-16-7.2-16-16s7.2-16 16-16h208c8.8 0 16 7.2 16 16zm0-64c0 8.8-7.2 16-16 16H176c-8.8 0-16-7.2-16-16s7.2-16 16-16h208c8.8 0 16 7.2 16 16z"/></svg>`
           },
           {
             id: 'heading',
             label: 'Heading',
             category: 'Basic',
             content: {
-              type: 'text',
+              type: 'text', // GrapesJS uses 'text' for headings too
               content: '<h1>Heading</h1>',
               style: { padding: '10px', minHeight: '50px' }
             },
@@ -251,8 +352,41 @@ const EditorGrapes = () => {
                 border: '1px dashed #3498db'
               }
             },
-            media: '<i class="fa fa-window-maximize"></i>'
+            media: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width: 24px; height: 24px;"><path fill="currentColor" d="M64 32C46.3 32 32 46.3 32 64v384c0 17.7 14.3 32 32 32h384c17.7 0 32-14.3 32-32V64c0-17.7-14.3-32-32-32H64zm384 64H64V64h384v32z"/></svg>`
+          },
+          // --- Added Document Viewer Block ---
+          {
+            id: 'document-viewer',
+            label: 'Document Viewer',
+            category: 'Advanced', // Or choose a suitable category
+            content: {
+              type: 'document-viewer', // Matches the component type name
+              content: '<div class="document-placeholder">Double click to upload RTF/DOCX</div>',
+              style: { 
+                padding: '20px',
+                minHeight: '150px', // Give it a decent initial height
+                backgroundColor: '#f8f9fa',
+                border: '2px dashed #adb5bd', // More prominent border
+                borderRadius: '4px',
+                display: 'flex', // Use flexbox for centering placeholder
+                justifyContent: 'center',
+                alignItems: 'center',
+                color: '#6c757d', // Placeholder text color
+                textAlign: 'center',
+                width: '100%' // Default to full width
+              },
+              // Store file info in attributes
+              attributes: { 
+                class: 'document-viewer-component', // Add a class for styling/selection
+                'data-file-name': '',
+                'data-original-content': '', // To store raw content if needed later
+                'data-original-type': '' // 'rtf' or 'docx'
+              }
+            },
+             // Use the regular file icon
+            media: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" style="width: 24px; height: 24px;"><path fill="currentColor" d="M0 64C0 28.7 28.7 0 64 0H224V128c0 17.7 14.3 32 32 32H384V448c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V64zm384 64H256V0L384 128z"/></svg>`
           }
+          // --- End Document Viewer Block ---
         ]
       },
       
@@ -687,6 +821,160 @@ const EditorGrapes = () => {
     editor.on('component:deselected', () => {
       selectedComponentRef.current = null;
     });
+
+    // --- Add Document Viewer Component Type ---
+    editor.DomComponents.addType('document-viewer', {
+      model: {
+        defaults: {
+          // Prevent dropping things inside the raw viewer
+          droppable: false, 
+          // Make it resizable (vertically) and draggable
+          resizable: {
+            tl: false, tr: false, bl: false, br: false, // Disable corner resizing
+            tc: false, bc: true, cl: false, cr: false,  // Enable bottom-center resizing
+            keyHeight: 'min-height', // Resizes the min-height property
+             // Optionally add options for aspect ratio, etc.
+            // ratioDefault: false, 
+            // minDim: 100, // Minimum dimension (height in this case)
+          },
+          draggable: true,
+          // Ensure class is set on the model for persistence
+          attributes: { class: 'document-viewer-component' }, 
+          // Traits are usually for simple property edits, not file uploads
+          // traits: [], 
+        },
+        // Add initialization logic if needed
+        // init() {
+        //   console.log('Document viewer component initialized');
+        // }
+      },
+      view: {
+         // Add attributes directly to the element in the view for styling
+        attributes: { class: 'document-viewer-component' }, 
+        events: {
+          'dblclick': 'onDblClick'
+        } as any, // Cast to any if needed for TS
+
+        // Optionally, update the view style when content changes from placeholder
+        init() {
+          this.listenTo(this.model, 'change:content', this.updateAppearance);
+          // Initial check in case content is loaded differently
+          this.updateAppearance(); 
+        },
+        
+        // This runs when the component is first rendered or its content changes
+        updateAppearance() {
+           const content = this.model.get('content');
+           const isPlaceholder = typeof content === 'string' && (content.includes('document-placeholder') || content.includes('loading-document') || content.includes('Error loading file'));
+           
+           // Adjust styles based on whether it's a placeholder or has real content
+           if (isPlaceholder) {
+               this.el.style.display = 'flex';
+               this.el.style.justifyContent = 'center';
+               this.el.style.alignItems = 'center';
+               this.el.style.border = '2px dashed #adb5bd'; // Keep border for placeholder
+               this.el.style.backgroundColor = '#f8f9fa'; // Keep bg for placeholder
+           } else {
+               // Reset styles when actual content is loaded
+               this.el.style.display = 'block'; // Or default display
+               this.el.style.justifyContent = '';
+               this.el.style.alignItems = '';
+                // Optionally remove border/bg for seamless integration
+               this.el.style.border = '1px solid #eee'; // Thin border for content
+               this.el.style.backgroundColor = '#fff'; // White background for content
+           }
+           // Call GrapesJS render to apply internal content updates if necessary
+           // this.render(); // Usually not needed if only changing styles
+        },
+
+        onDblClick(e: MouseEvent) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const model = this.model; // Get the component model instance
+
+          // Create file input dynamically
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.rtf,.docx'; // Accept both types
+
+          // Handle file selection via arrow function to maintain 'this' context if needed
+          input.onchange = async (ev) => {
+            const file = (ev.target as HTMLInputElement).files?.[0];
+            if (!file) return;
+
+            // Basic file type check based on extension
+            const fileNameLower = file.name.toLowerCase();
+            const fileType = fileNameLower.endsWith('.docx') ? 'docx' : 
+                             fileNameLower.endsWith('.rtf') ? 'rtf' : null;
+
+            if (!fileType) {
+              alert('Invalid file type. Please upload a .docx or .rtf file.');
+              input.value = ''; // Reset input
+              return;
+            }
+            
+            // Show loading state immediately
+            model.set('content', '<div class="loading-document">Processing document... Please wait.</div>');
+
+            try {
+              let html = '';
+              let originalContent = ''; // Store original file content as string
+
+              if (fileType === 'docx') {
+                const arrayBuffer = await file.arrayBuffer();
+                // We'll store original as base64 later
+                const result = await mammoth.convertToHtml({ arrayBuffer });
+                html = result.value;
+                 // Attempt to get text content for storage (might fail for complex docx)
+                try {
+                  originalContent = await mammoth.extractRawText({ arrayBuffer }).then(res => res.value);
+                } catch (textErr) {
+                   console.warn("Could not extract raw text from DOCX, storing placeholder.", textErr);
+                   originalContent = "[Original DOCX Content Not Extracted]";
+                }
+
+              } else if (fileType === 'rtf') {
+                originalContent = await file.text(); // Read RTF as text
+                html = await convertRtfToHtml(originalContent); // Use our conversion utility
+              }
+
+              // Sanitize the generated HTML before inserting
+              const cleanHtml = sanitizeHtmlContent(html);
+              console.log(`Processed ${fileType}, Original length: ${originalContent.length}, HTML length: ${html.length}, Sanitized length: ${cleanHtml.length}`);
+              
+              // Update the component's content and attributes
+              model.set('content', cleanHtml); 
+              // Store original content base64 encoded for safety and to handle binary data
+              model.addAttributes({
+                'data-file-name': file.name,
+                'data-original-content': btoa(unescape(encodeURIComponent(originalContent))), // Base64 encode text
+                'data-original-type': fileType
+              });
+
+            } catch (error) {
+              console.error(`Error processing ${file.name}:`, error);
+              alert(`Error processing ${file.name}. Check the console for details.`);
+              // Revert to placeholder on error
+               model.set('content', '<div class="document-placeholder">Error loading file. Double click to try again.</div>');
+               // Clear attributes on error
+               model.addAttributes({ 
+                  'data-file-name': '', 
+                  'data-original-content': '',
+                  'data-original-type': ''
+               });
+            } finally {
+                // Clean up the file input in case the user cancels next time
+                input.value = ''; 
+            }
+          }; // End of onchange handler
+
+          // Trigger the file input dialog
+          input.click();
+        } // End of onDblClick
+      } // End of view
+    }); // End of addType('document-viewer')
+    // --- End Document Viewer Component Type ---
 
     return editor;
   };
@@ -1898,6 +2186,43 @@ const EditorGrapes = () => {
         throw new Error("Editor not initialized");
       }
 
+      // --- Helper Function for PDF Processing ---
+      const processDocumentViewers = async (canvasDoc: Document) => {
+          // Find viewers within the specific canvas document context
+          const documentViewers = canvasDoc.querySelectorAll('.document-viewer-component'); 
+          console.log(`[PDF] Found ${documentViewers.length} document viewers to process.`);
+          
+          for (const viewerElement of documentViewers) {
+             const viewer = viewerElement as HTMLElement; // Cast for style access
+             // Check if it's still a placeholder by looking for specific content/classes
+             const isPlaceholder = viewer.querySelector('.document-placeholder') || viewer.querySelector('.loading-document') || viewer.textContent?.includes('Error loading file');
+            
+             if (!isPlaceholder) {
+                // Prepare actual content for PDF rendering
+                const fileName = viewer.dataset.fileName || 'document';
+                console.log(`[PDF] Processing content for: ${fileName}`);
+                viewer.style.minHeight = 'auto'; // Remove min-height constraint
+                viewer.style.border = 'none'; // Remove editor border
+                viewer.style.backgroundColor = 'transparent'; // Remove editor background
+                viewer.style.display = 'block'; // Ensure it takes up space like a block
+                viewer.style.overflow = 'visible'; // IMPORTANT: Allow content to overflow for capture
+                viewer.style.height = 'auto'; // Let height be determined by content
+                // Remove padding added for placeholder centering
+                viewer.style.padding = '0'; 
+                viewer.style.justifyContent = ''; 
+                viewer.style.alignItems = ''; 
+             } else {
+                 // Hide placeholders completely in the PDF
+                 console.log('[PDF] Hiding placeholder viewer.');
+                 viewer.style.display = 'none'; 
+             }
+          }
+          // Return a promise that resolves after a short delay to allow DOM updates
+          await new Promise(resolve => setTimeout(resolve, 50)); 
+      };
+      // --- End Helper Function ---
+
+
       // Get all pages
       const allPages = editor.Pages.getAll();
       if (allPages.length === 0) {
@@ -1914,66 +2239,115 @@ const EditorGrapes = () => {
         format: 'a4'
       });
       
-      // PDF dimensions (A4)
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
+      // PDF dimensions (A4 in mm)
+      const pdfPageWidth = pdf.internal.pageSize.getWidth();
+      const pdfPageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15; // 15mm margin
+      const contentWidth = pdfPageWidth - 2 * margin;
+      // const contentHeight = pdfPageHeight - 2 * margin; // Max content height per page
+
+      console.log('[PDF] Starting PDF generation...');
       
       // Process each page
-      let isFirstPage = true;
+      let firstPdfPage = true;
       for (const page of allPages) {
-        // Add a new page if this isn't the first page
-        if (!isFirstPage) {
+        console.log(`[PDF] Processing page: ${page.getName()}`);
+        // Add a new PDF page if this isn't the first page being added
+        if (!firstPdfPage) {
           pdf.addPage();
         } else {
-          isFirstPage = false;
+          firstPdfPage = false;
         }
         
-        // Switch to this page
+        // Switch editor to this page
         editor.Pages.select(page);
         
-        // Wait for the canvas to render
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Wait briefly for editor to potentially switch/render
+        await new Promise(resolve => setTimeout(resolve, 200)); 
         
-        // Get the canvas element
-        const canvas = editor.Canvas.getFrameEl().contentDocument.body;
-        if (!canvas) {
-          continue; // Skip if no canvas
+        // Get the editor's canvas iframe element and its content document/body
+        const frameEl = editor.Canvas.getFrameEl();
+        if (!frameEl || !frameEl.contentDocument || !frameEl.contentDocument.body) {
+           console.warn(`[PDF] Skipping page ${page.getName()} - Canvas body not found.`);
+          continue; 
         }
+        const canvasDoc = frameEl.contentDocument;
+        const canvasBody = canvasDoc.body;
         
-        // Convert canvas to image
-        const canvasImage = await html2canvas(canvas, {
-          scale: 2,
-          logging: false,
+        // Ensure body has dimensions needed for capture
+        canvasBody.style.width = canvasBody.scrollWidth + 'px';
+        canvasBody.style.height = canvasBody.scrollHeight + 'px';
+        
+        // **Prepare the content within the canvas for PDF capture**
+        await processDocumentViewers(canvasDoc); 
+        
+        // **Capture the entire page content using html2canvas**
+        console.log(`[PDF] Capturing canvas for page: ${page.getName()} (Scroll Height: ${canvasBody.scrollHeight}px)`);
+        const pageCanvas = await html2canvas(canvasBody, {
+          scale: 2, // Increase scale for better resolution
+          logging: false, // Set to true for debugging html2canvas
           useCORS: true,
-          allowTaint: true
+          allowTaint: true,
+           // Important: Capture the full height, not just the viewport
+          height: canvasBody.scrollHeight, 
+          width: canvasBody.scrollWidth,
+          windowHeight: canvasBody.scrollHeight,
+          windowWidth: canvasBody.scrollWidth,
+          x: 0, // Start capture from top-left
+          y: 0
         });
+        console.log(`[PDF] Canvas captured for ${page.getName()}.`);
         
-        // Calculate the required scaling to fit the PDF
-        const imgWidth = pdfWidth - 28; // 14mm margin on each side
-        const imgHeight = (canvasImage.height * imgWidth) / canvasImage.width;
+        const imgData = pageCanvas.toDataURL('image/png'); // Use PNG for potentially better quality
+        const imgProps = pdf.getImageProperties(imgData);
         
-        // Add canvas image to PDF
-        const imgData = canvasImage.toDataURL('image/jpeg', 0.95);
-        pdf.addImage(imgData, 'JPEG', 14, 14, imgWidth, imgHeight);
-      }
+        // Calculate image dimensions to fit PDF page width
+        const imgWidth = contentWidth;
+        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+        
+        // **Add the captured image to the PDF, splitting across pages if necessary**
+        let heightLeft = imgHeight;
+        let position = margin; // Start drawing from top margin
+
+        // pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight); // Add image without splitting first
+
+        // Simple splitting logic (can be improved)
+        while (heightLeft > 0) {
+           const pageContentHeight = pdfPageHeight - 2 * margin; 
+           // Clip the image section for the current page
+           pdf.addImage(imgData, 'PNG', margin, position - (imgHeight - heightLeft), imgWidth, imgHeight);
+           
+           heightLeft -= pageContentHeight; // Decrease remaining height
+           
+           if (heightLeft > 0) {
+             pdf.addPage(); // Add a new page
+             position = margin; // Reset position for the new page
+           }
+        }
+         console.log(`[PDF] Added image for ${page.getName()} to PDF (Height: ${imgHeight}mm).`);
+
+      } // End loop through editor pages
       
-      // Restore original page
+      // Restore original editor page
       editor.Pages.select(currentPageId);
       
       // Create a blob URL for the PDF
+      console.log('[PDF] Generating PDF blob...');
       const pdfBlob = pdf.output('blob');
       const url = URL.createObjectURL(pdfBlob);
       
-      // Update state to show the PDF
+      // Update state to show the PDF preview modal
       setPdfUrl(url);
       setShowPdfPreview(true);
+      console.log('[PDF] PDF generation complete.');
+
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Error generating PDF preview. Please try again.');
+      alert('Error generating PDF preview. Please check the console for details.');
     } finally {
       setIsGeneratingPdf(false);
     }
-  };
+  }; // End generatePDF
 
   // Convert components to XML format (keeping this function from the original code)
   const convertToXML = (components: any): string => {
@@ -2229,10 +2603,10 @@ const EditorGrapes = () => {
           </button>
           <button 
             className="btn-preview" 
-            onClick={generatePDF}
+            onClick={generatePDF} // Connect the button
             disabled={isGeneratingPdf}
           >
-            <FontAwesomeIcon icon={faFileAlt} /> Preview
+            <FontAwesomeIcon icon={faFileAlt} /> {isGeneratingPdf ? 'Generating...' : 'Preview'}
           </button>
         </div>
       </div>
@@ -2418,14 +2792,16 @@ const EditorGrapes = () => {
       {/* PDF Generation Loading Indicator */}
       {isGeneratingPdf && (
         <div className="pdf-loading">
-          Generating PDF preview...
+          <div className="spinner"></div> 
+          Generating PDF preview... Please wait.
         </div>
       )}
 
       {/* PDF Preview Modal */}
       {showPdfPreview && pdfUrl && (
-        <div className="modal-overlay">
-          <div className="modal-container pdf-preview-modal">
+        <div className="modal-overlay" onClick={() => setShowPdfPreview(false)}> {/* Close on overlay click */}
+          {/* Prevent modal click from closing */}
+          <div className="modal-container pdf-preview-modal" onClick={(e) => e.stopPropagation()}> 
             <div className="modal-header">
               <h3><FontAwesomeIcon icon={faFileAlt} /> PDF Preview</h3>
               <button 
@@ -2433,7 +2809,7 @@ const EditorGrapes = () => {
                 onClick={() => {
                   setShowPdfPreview(false);
                   if (pdfUrl) {
-                    URL.revokeObjectURL(pdfUrl);
+                    URL.revokeObjectURL(pdfUrl); // Clean up blob URL
                     setPdfUrl(null);
                   }
                 }}
@@ -2443,12 +2819,13 @@ const EditorGrapes = () => {
               <iframe 
                 src={pdfUrl} 
                 style={{ width: '100%', height: '100%', border: 'none' }}
+                title="PDF Preview" // Add title for accessibility
               />
             </div>
             <div className="modal-footer">
               <a 
                 href={pdfUrl} 
-                download="website-preview.pdf" 
+                download={`${currentPage?.getName() || 'website'}-preview.pdf`} // Dynamic filename
                 className="download-btn"
               >
                 <FontAwesomeIcon icon={faDownload} /> Download PDF
